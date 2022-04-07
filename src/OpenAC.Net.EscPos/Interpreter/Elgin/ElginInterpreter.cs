@@ -42,15 +42,17 @@ namespace OpenAC.Net.EscPos.Interpreter.Elgin
 
         internal ElginInterpreter(Encoding enconder) : base(enconder)
         {
-            StatusResolver = new ElginStatusResolver();
         }
 
         #endregion Methods
 
         #region Methods
 
-        protected override void ResolverInitialize()
+        protected override void IniciarInterpreter()
         {
+            Status = new ElginStatusResolver();
+            InfoImpressora = new BemaInfoImpressoraResolver(Enconder);
+
             // Default
             CommandResolver.AddResolver<TextCommand, DefaultTextResolver>(new DefaultTextResolver(Enconder, DefaultCommands.EscBema));
             CommandResolver.AddResolver<ZeraCommand, DefaultZeraResolver>(new DefaultZeraResolver(DefaultCommands.EscBema));
@@ -62,6 +64,7 @@ namespace OpenAC.Net.EscPos.Interpreter.Elgin
             CommandResolver.AddResolver<ImageCommand, DefaultImageResolver>(new DefaultImageResolver(DefaultCommands.EscBema));
 
             // Iguais da Bema
+            CommandResolver.AddResolver<CodePageCommand, BemaCodePageResolver>(new BemaCodePageResolver(DefaultCommands.EscBema));
             CommandResolver.AddResolver<BarcodeCommand, BemaBarcodeCommandResolver>(new BemaBarcodeCommandResolver(Enconder, DefaultCommands.EscBema));
             CommandResolver.AddResolver<LogoCommand, BemaLogoCommandResolver>(new BemaLogoCommandResolver(DefaultCommands.EscBema));
 

@@ -6,7 +6,7 @@
 // Last Modified By : Rafael Dias
 // Last Modified On : 17-03-2022
 // ***********************************************************************
-// <copyright file="CmdConst.cs" company="OpenAC .Net">
+// <copyright file="DefaultBarcodeResolver.cs" company="OpenAC .Net">
 //		        		   The MIT License (MIT)
 //	     		    Copyright (c) 2014 - 2021 Projeto OpenAC .Net
 //
@@ -29,38 +29,48 @@
 // <summary></summary>
 // ***********************************************************************
 
-namespace OpenAC.Net.EscPos.Commom
+using System;
+using System.Collections.Generic;
+using OpenAC.Net.Devices.Commom;
+using OpenAC.Net.EscPos.Command;
+using OpenAC.Net.EscPos.Commom;
+
+namespace OpenAC.Net.EscPos.Interpreter.Resolver
 {
-    internal static class CmdConst
+    public sealed class DefaultCodePageResolver : CommandResolver<CodePageCommand>
     {
-        public static byte NUL => 0;
+        #region Constructors
 
-        public static byte ENQ => 5;
+        public DefaultCodePageResolver(IReadOnlyDictionary<CmdEscPos, byte[]> dict) : base(dict)
+        {
+        }
 
-        public static byte ESC => 27;
+        #endregion Constructors
 
-        public static byte FS => 28;
+        #region Methods
 
-        public static byte GS => 29;
+        public override byte[] Resolve(CodePageCommand command)
+        {
+            if (command.PaginaCodigo == PaginaCodigo.pcUTF8) return new byte[0];
 
-        public static byte BS => 8;
+            using var builder = new ByteArrayBuilder();
 
-        public static byte TAB => 9;
+            var codePage = command.PaginaCodigo switch
+            {
+                PaginaCodigo.pc437 => new byte[] { 0 },
+                PaginaCodigo.pc850 => new byte[] { 2 },
+                PaginaCodigo.pc852 => new byte[] { 18 },
+                PaginaCodigo.pc860 => new byte[] { 3 },
+                PaginaCodigo.pc1252 => new byte[] { 16 },
+                _ => throw new ArgumentOutOfRangeException()
+            };
 
-        public static byte LF => 10;
+            builder.Append(new byte[] { CmdConst.ESC, 116 });
+            builder.Append(codePage);
 
-        public static byte FF => 12;
+            return builder.ToArray();
+        }
 
-        public static byte CR => 13;
-
-        public static byte SI => 15;
-
-        public static byte DC2 => 18;
-
-        public static byte DC4 => 20;
-
-        public static byte SYN => 22;
-
-        public static byte BELL => 7;
+        #endregion Methods
     }
 }

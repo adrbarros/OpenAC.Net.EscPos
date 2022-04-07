@@ -6,7 +6,7 @@
 // Last Modified By : Rafael Dias
 // Last Modified On : 17-03-2022
 // ***********************************************************************
-// <copyright file="CmdConst.cs" company="OpenAC .Net">
+// <copyright file="InformacoesImpressora.cs" company="OpenAC .Net">
 //		        		   The MIT License (MIT)
 //	     		    Copyright (c) 2014 - 2021 Projeto OpenAC .Net
 //
@@ -29,38 +29,49 @@
 // <summary></summary>
 // ***********************************************************************
 
+using System.Linq;
+using System.Text;
+
 namespace OpenAC.Net.EscPos.Commom
 {
-    internal static class CmdConst
+    public class InformacoesImpressora
     {
-        public static byte NUL => 0;
+        #region Constructors
 
-        public static byte ENQ => 5;
+        public InformacoesImpressora(string fabricante, string modelo, string firmware, string serial, bool guilhotina)
+        {
+            Fabricante = fabricante;
+            Modelo = modelo;
+            Firmware = firmware;
+            Serial = serial;
+            Guilhotina = guilhotina;
+        }
 
-        public static byte ESC => 27;
+        #endregion Constructors
 
-        public static byte FS => 28;
+        #region Properties
 
-        public static byte GS => 29;
+        public string Fabricante { get; }
 
-        public static byte BS => 8;
+        public string Modelo { get; }
 
-        public static byte TAB => 9;
+        public string Firmware { get; }
 
-        public static byte LF => 10;
+        public string Serial { get; }
 
-        public static byte FF => 12;
+        public bool Guilhotina { get; }
 
-        public static byte CR => 13;
+        public static InformacoesImpressora Empty = new("", "", "", "", false);
 
-        public static byte SI => 15;
+        #endregion Properties
 
-        public static byte DC2 => 18;
-
-        public static byte DC4 => 20;
-
-        public static byte SYN => 22;
-
-        public static byte BELL => 7;
+        public override string ToString()
+        {
+            var props = GetType().GetProperties();
+            var sb = new StringBuilder();
+            foreach (var p in props)
+                sb.AppendLine(p.Name + ": " + p.GetValue(this, null));
+            return sb.ToString();
+        }
     }
 }

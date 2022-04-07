@@ -6,7 +6,7 @@
 // Last Modified By : Rafael Dias
 // Last Modified On : 17-03-2022
 // ***********************************************************************
-// <copyright file="ElginStatusResolver.cs" company="OpenAC .Net">
+// <copyright file="BemaCodePageResolver.cs" company="OpenAC .Net">
 //		        		   The MIT License (MIT)
 //	     		    Copyright (c) 2014 - 2021 Projeto OpenAC .Net
 //
@@ -30,55 +30,48 @@
 // ***********************************************************************
 
 using System;
+using System.Collections.Generic;
 using OpenAC.Net.Core.Extensions;
+using OpenAC.Net.Devices.Commom;
+using OpenAC.Net.EscPos.Command;
 using OpenAC.Net.EscPos.Commom;
 using OpenAC.Net.EscPos.Interpreter.Resolver;
 
-namespace OpenAC.Net.EscPos.Interpreter.Elgin
+namespace OpenAC.Net.EscPos.Interpreter.Bematech
 {
-    public sealed class ElginStatusResolver : InfoResolver<EscPosTipoStatus>
+    public sealed class BemaCodePageResolver : CommandResolver<CodePageCommand>
     {
-        public ElginStatusResolver() :
-            base(new[] { new byte[] { 5 } },
-                dados =>
-                {
-                    if (dados.IsNullOrEmpty()) return EscPosTipoStatus.ErroLeitura;
+        #region Constructors
 
-                    EscPosTipoStatus? status = null;
-
-                    var bitTest = new Func<int, byte, bool>((value, index) => ((value >> index) & 1) == 1);
-
-                    var b = dados[0][0];
-                    if (!bitTest(b, 0))
-                        status = EscPosTipoStatus.OffLine;
-
-                    if (bitTest(b, 1))
-                        if (status.HasValue)
-                            status |= EscPosTipoStatus.SemPapel;
-                        else
-                            status = EscPosTipoStatus.SemPapel;
-
-                    if (bitTest(b, 2))
-                        if (status.HasValue)
-                            status |= EscPosTipoStatus.GavetaAberta;
-                        else
-                            status = EscPosTipoStatus.GavetaAberta;
-
-                    if (bitTest(b, 3))
-                        if (status.HasValue)
-                            status |= EscPosTipoStatus.TampaAberta;
-                        else
-                            status = EscPosTipoStatus.TampaAberta;
-
-                    if (bitTest(b, 4))
-                        if (status.HasValue)
-                            status |= EscPosTipoStatus.PoucoPapel;
-                        else
-                            status = EscPosTipoStatus.PoucoPapel;
-
-                    return status ?? EscPosTipoStatus.Nenhum;
-                })
+        public BemaCodePageResolver(IReadOnlyDictionary<CmdEscPos, byte[]> dict) : base(dict)
         {
         }
+
+        #endregion Constructors
+
+        #region Methods
+
+        public override byte[] Resolve(CodePageCommand command)
+        {
+            if (command.PaginaCodigo.IsIn(PaginaCodigo.pc852, PaginaCodigo.pc1252)) return new byte[0];
+
+            using var builder = new ByteArrayBuilder();
+
+            var codePage = command.PaginaCodigo switch
+            {
+                PaginaCodigo.pc437 => new byte[] { 3 },
+                PaginaCodigo.pc850 => new byte[] { 2 },
+                PaginaCodigo.pc860 => new byte[] { 4 },
+                PaginaCodigo.pcUTF8 => new byte[] { 8 },
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
+            builder.Append(new byte[] { CmdConst.ESC, 116 });
+            builder.Append(codePage);
+
+            return builder.ToArray();
+        }
+
+        #endregion Methods
     }
 }

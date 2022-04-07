@@ -6,7 +6,7 @@
 // Last Modified By : Rafael Dias
 // Last Modified On : 17-03-2022
 // ***********************************************************************
-// <copyright file="CmdConst.cs" company="OpenAC .Net">
+// <copyright file="CodePageCommand.cs" company="OpenAC .Net">
 //		        		   The MIT License (MIT)
 //	     		    Copyright (c) 2014 - 2021 Projeto OpenAC .Net
 //
@@ -29,38 +29,25 @@
 // <summary></summary>
 // ***********************************************************************
 
-namespace OpenAC.Net.EscPos.Commom
+using OpenAC.Net.EscPos.Commom;
+using OpenAC.Net.EscPos.Interpreter;
+
+namespace OpenAC.Net.EscPos.Command
 {
-    internal static class CmdConst
+    public sealed class CodePageCommand : PrintCommand<CodePageCommand>
     {
-        public static byte NUL => 0;
+        #region Constructors
 
-        public static byte ENQ => 5;
+        public CodePageCommand(EscPosInterpreter interpreter) : base(interpreter)
+        {
+        }
 
-        public static byte ESC => 27;
+        #endregion Constructors
 
-        public static byte FS => 28;
+        #region Properties
 
-        public static byte GS => 29;
+        public PaginaCodigo PaginaCodigo { get; set; } = PaginaCodigo.pc850;
 
-        public static byte BS => 8;
-
-        public static byte TAB => 9;
-
-        public static byte LF => 10;
-
-        public static byte FF => 12;
-
-        public static byte CR => 13;
-
-        public static byte SI => 15;
-
-        public static byte DC2 => 18;
-
-        public static byte DC4 => 20;
-
-        public static byte SYN => 22;
-
-        public static byte BELL => 7;
+        #endregion Properties
     }
 }

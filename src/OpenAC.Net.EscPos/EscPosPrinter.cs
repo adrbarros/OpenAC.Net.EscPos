@@ -34,7 +34,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using OpenAC.Net.Core;
 using OpenAC.Net.Core.Extensions;
 using OpenAC.Net.Core.Logging;
@@ -55,7 +54,7 @@ namespace OpenAC.Net.EscPos
         private EscPosInterpreter interpreter;
         private ProtocoloEscPos protocolo;
         private bool inicializada;
-        private Encoding encoder;
+        private PaginaCodigo paginaCodigo;
 
         #endregion Fields
 
@@ -69,9 +68,9 @@ namespace OpenAC.Net.EscPos
 
             commands = new List<IPrintCommand>();
 
-            encoder = OpenEncoding.IBM850;
+            paginaCodigo = PaginaCodigo.pc850;
             protocolo = ProtocoloEscPos.EscPos;
-            interpreter = EscPosInterpreterFactory.Create(protocolo, encoder);
+            interpreter = EscPosInterpreterFactory.Create(protocolo, paginaCodigo);
         }
 
         #endregion Constructors
@@ -97,22 +96,22 @@ namespace OpenAC.Net.EscPos
                 protocolo = value;
 
                 interpreter = null;
-                interpreter = EscPosInterpreterFactory.Create(value, Encoder);
+                interpreter = EscPosInterpreterFactory.Create(value, PaginaCodigo);
             }
         }
 
         /// <summary>
         /// Define/Obtém o enconding para comunicação com a impressora.
         /// </summary>
-        public Encoding Encoder
+        public PaginaCodigo PaginaCodigo
         {
-            get => encoder;
+            get => paginaCodigo;
             set
             {
                 Guard.Against<OpenException>(Conectado, "Não pode mudar o protocolo quando esta conectado.");
-                if (encoder == value) return;
+                if (paginaCodigo == value) return;
 
-                encoder = value;
+                paginaCodigo = value;
 
                 interpreter = null;
                 interpreter = EscPosInterpreterFactory.Create(protocolo, value);
@@ -159,6 +158,35 @@ namespace OpenAC.Net.EscPos
         /// </summary>
         public bool SuportaModoPagina => interpreter?.CommandResolver?.HasResolver<ModoPaginaCommand>() ?? false;
 
+        /// <summary>
+        /// Define/Obtém a quantidade de coluna quando a fonte é normal.
+        /// </summary>
+        public int Colunas { get; set; } = 48;
+
+        /// <summary>
+        /// Retorna a quantidade de colunas quando a fonte é expandida.
+        /// </summary>
+        public int ColunasExpandida
+        {
+            get
+            {
+                if (interpreter == null) return 0;
+                return (int)Math.Truncate(Colunas / interpreter.RazaoColuna.Expandida);
+            }
+        }
+
+        /// <summary>
+        /// Retorna a quantidade de colunas quando a fonte é concensada.
+        /// </summary>
+        public int ColunasCondensada
+        {
+            get
+            {
+                if (interpreter == null) return 0;
+                return (int)Math.Truncate(Colunas / interpreter.RazaoColuna.Condensada);
+            }
+        }
+
         #endregion properties
 
         #region Methods
@@ -200,10 +228,24 @@ namespace OpenAC.Net.EscPos
 
             if (inicializada) return;
 
-            var cmd = new EspacoEntreLinhasCommand(interpreter) { Espaco = EspacoEntreLinhas };
-            var dados = cmd.Content;
+            using var builder = new ByteArrayBuilder();
 
-            device.Write(dados);
+            IPrintCommand cmd;
+            if (interpreter.CommandResolver.HasResolver<EspacoEntreLinhasCommand>())
+            {
+                cmd = new EspacoEntreLinhasCommand(interpreter) { Espaco = EspacoEntreLinhas };
+                builder.Append(cmd.Content);
+            }
+
+            if (interpreter.CommandResolver.HasResolver<CodePageCommand>())
+            {
+                cmd = new CodePageCommand(interpreter) { PaginaCodigo = paginaCodigo };
+                builder.Append(cmd.Content);
+            }
+
+            if (builder.Length > 0)
+                device.Write(builder.ToArray());
+
             inicializada = true;
         }
 
@@ -257,13 +299,15 @@ namespace OpenAC.Net.EscPos
         {
             Guard.Against<OpenException>(!Conectado, "A porta não está aberta");
 
+            if (interpreter.Status == null) return EscPosTipoStatus.ErroLeitura;
+
             try
             {
                 byte[][] ret;
                 var leituras = 0;
                 do
                 {
-                    var dados = interpreter.StatusCommand;
+                    var dados = interpreter.Status.Commands;
                     if (dados.IsNullOrEmpty()) return EscPosTipoStatus.Nenhum;
 
                     ret = dados.Select(dado => device.WriteRead(dado, 10)).ToArray();
@@ -272,7 +316,7 @@ namespace OpenAC.Net.EscPos
 
                 if (!ret.Any()) return EscPosTipoStatus.ErroLeitura;
 
-                var status = interpreter.ProcessarStatus(ret);
+                var status = interpreter.Status.Resolve(ret);
                 if (!Gaveta.SinalInvertido) return status;
 
                 if (status.HasFlag(EscPosTipoStatus.GavetaAberta))
@@ -286,6 +330,31 @@ namespace OpenAC.Net.EscPos
             {
                 this.Log().Error("Erro ao ler status", ex);
                 return EscPosTipoStatus.ErroLeitura;
+            }
+        }
+
+        /// <summary>
+        /// Le as informações da impressora.
+        /// </summary>
+        /// <returns></returns>
+        public InformacoesImpressora LerInfoImpressora()
+        {
+            Guard.Against<OpenException>(!Conectado, "A porta não está aberta");
+
+            if (interpreter.InfoImpressora == null) return InformacoesImpressora.Empty;
+
+            try
+            {
+                var dados = interpreter.InfoImpressora.Commands;
+                if (dados.IsNullOrEmpty()) return null;
+
+                var ret = dados.Select(dado => device.WriteRead(dado, 500)).ToArray();
+                return !ret.Any() ? InformacoesImpressora.Empty : interpreter.InfoImpressora.Resolve(ret);
+            }
+            catch (Exception ex)
+            {
+                this.Log().Error("Erro ao ler as informações da impressora", ex);
+                return InformacoesImpressora.Empty;
             }
         }
 
